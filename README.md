@@ -12,6 +12,13 @@ The design proposed by Lukas is quite similar to mine;  this may be related to t
 
 ##3. Was the CA1 implementation in accordance with the design?
 
+Lukas's CA1 implementation slightly differed to the proposed design.  The detail in his design about discarding apples that have taken longer than 5 seconds to be processed does not get fully implemented!  To his implementation's defense, the structure of three threads, two message queues in between, and most of the timing logic located in the actuator thread follows closely to the design diagram.  The discrepancy may be due to the fact that the diagram, as is, does not satisfy the design intention of discarding apples that are still being processed by the `process_photo` function after 5 seconds have elapsed.
+
+![MAYBE SAME ADDITIONAL DIAGRAM SUGGESTION MADE BY ME](path/to/where.png)
+This is where I should do a DFD of the Process Photo Thread.  Where there is concurrent logic going on, where the message gets sent to the actuator message buffer if 5 seconds has already passed with an UNKNOWN quality tag. Otherwise, send the quality tag which the `process_photo` function has returned.
+
+With the current implementation, the `process_photo` function blocks the do-loop in the `runProcess` method;  since the passing of the message to the quality message queue comes below the `process_photo` function.
+
 ##4. Were there any notable features or shortcomings that you noticed in the CA1 implementation? What improvements would you suggest to the CA1 implementation, if any?
 
 Try running the CA1 code provided by your peer under different test conditions. With virtual
