@@ -27,3 +27,39 @@ simulate test conditions by running other applications to load your computer and
 performance varies. Document your findings in the report:
 
 ##5. Summarize the performance of the CA1 code under different conditions (document the relevant conditions). Can you explain your the observed variability in performance in terms of the design or implementation decisions? Do you think there is scope for improvement in performance? In case you test any of your recommended changes to the design/code, you may wish to include code snippets and performance improvement details in an appendix to your report (appendix does not count towards the page limit). This is optional, but encouraged, as it will allow you to test your ideas, and enhance your learning experience.
+
+No stress test on a 4 cpu system
+
+    -- TEST RESULTS --
+    Elapsed time (minutes): 5.09
+    Number of apples: 300
+    Number of bad apples discarded: 18
+    Number of good apples discarded: 22
+    Number of bad apples packed: 11
+    Number of apples spoilt due to bad apples: 105
+    Revenue from sale of good apples: $144
+    Revenue loss due to system shortcomings: $127 (47%)
+
+Using the command `stress --cpu 1` on a 4 cpu system
+
+    -- TEST RESULTS --
+    Elapsed time (minutes): 5.09
+    Number of apples: 300
+    Number of bad apples discarded: 29
+    Number of good apples discarded: 3
+    Number of bad apples packed: 3
+    Number of apples spoilt due to bad apples: 45
+    Revenue from sale of good apples: $220
+    Revenue loss due to system shortcomings: $48 (18%)
+
+Using the command `stress --cpu 4` on a 4 cpu system
+
+    -- TEST RESULTS --
+    Elapsed time (minutes): 5.10
+    Number of apples: 300
+    Number of bad apples discarded: 24
+    Number of good apples discarded: 15
+    Number of bad apples packed: 2
+    Number of apples spoilt due to bad apples: 22
+    Revenue from sale of good apples: $237
+    Revenue loss due to system shortcomings: $37 (14%)
