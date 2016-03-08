@@ -83,3 +83,99 @@ and for Number of Bad Apples packed,
 The results here are inconclusive from single tests, as there a large element of randomness in the types of apples sent to the external processing unit, and the time the external processing unit requires. I (the reviewer) did not have time to run these stress tests for multiple trials to obtain an average performance.  As stated, the current implementation does not require obvious improvements; the implementation of threads, message queues, and the structures sent in the messages are all quite efficient.
 
 In regards to the design, there is improvements to be made, as shown in the expanded diagram I have provided in the beginning of this review. Successful implementation of this design would result in the number of bad apples packed to be zero, and probably the number of bad and good apples to increase slightly (as we are discarding all apples if there quality could not be determined successfully or in time).
+
+I made a quick edit to the implementation, reflecting my suggested redesign of the processing thread, which is `runProcess` in Lukas's code. In particular, a separate `monitor` thread is spun off, which manages the sending to the next message queue if the time deadline has arrived, without the `process_photo` function finishing.
+
+Unfortunately, it seems like there are still bad apples going through the pipeline (not all of them are being discarded).  There might be some bugs in the timing, but in general, more apples are being discarded, which meets the design intention.
+
+    -- TEST RESULTS --
+    Elapsed time (minutes): 5.11
+    Number of apples: 300
+    Number of bad apples discarded: 27
+    Number of good apples discarded: 17
+    Number of bad apples packed: 2
+    Number of apples spoilt due to bad apples: 46
+    Revenue from sale of good apples: $208
+    Revenue loss due to system shortcomings: $63 (23%)
+
+My improved implementation reflecting this redesign is given below
+
+    void* runProcess(void* p) { // process thread implementation
+
+        printf("Processing thread started\n");
+
+        int counter = 0;
+
+        do { // begin do-loop
+            counter++;
+
+            int interruptFlag = 0;
+
+            // receive photo and time data
+            struct photo_msgbuf bufPempty;
+            msgrcv(msqidPhoto, &bufPempty, sizePhoto, 1, 0);
+
+            // get startTime info for everyone
+            struct timeval startTime = bufPempty.photoTime.startingTime;
+
+            // define monitor function
+            void * monitor(void* p) {
+                while (interruptFlag == 0) {
+                    // get the current time
+                    struct timeval currentTime;
+                    gettimeofday(&currentTime, NULL);
+
+                    // calculate the time elapsed
+                    double processTimeS = currentTime.tv_sec - startTime.tv_sec;
+                    // assert( processTimeS >= 0 );
+                    double processTimeMS = currentTime.tv_usec - startTime.tv_usec;
+                    // assert( processTimeMS >= 0 );
+                    double processTime = processTimeS + processTimeMS/1000000;
+
+                    // overtime
+                    if (processTime >= 5.0) {
+                        printf("damn slow. Bypassing the external processing unit!");
+                        // we're sending an UNKNOWN to the next message queue
+                        // without letting the external processing unit finish
+                        interruptFlag = 1;
+
+                        // send message with UNKNOWN and time data
+                        struct qualTime_msgbuf bufQualTime = {2, {UNKNOWN, startTime}};
+                        msgsnd(msqidProcess, &bufQualTime, sizeProcess, 0);
+
+                    }
+
+                    // poll every .10 seconds
+                    usleep(0.10*1000000);
+                }
+            }
+            // spin off monitor thread
+            pthread_t monitorThread;
+            pthread_create(&monitorThread, NULL, &monitor, NULL);
+
+            // process apple and get its quality
+            QUALITY photoQuality = process_photo(bufPempty.photoTime.photo);
+
+            // do the normal course of action if the external processing unit was not superseeded
+            if (interruptFlag == 0) {
+                if (photoQuality == GOOD)
+                {
+                    printf("Quality is GOOD for apple %d\n", counter);
+                } else if (photoQuality == BAD) {
+                    printf("Quality is BAD for apple %d\n", counter);
+                } else {
+                    printf("Quality is UNKNOWN for apple %d\n", counter);
+                }
+
+                // send message with apple quaility and time data
+                struct qualTime_msgbuf bufQualTime = {2, {photoQuality, startTime}};
+                msgsnd(msqidProcess, &bufQualTime, sizeProcess, 0);
+            }
+
+        //} while(counter <= numApples);
+        } while(more_apples() == 1); // end do-looop
+
+        printf("Processing thread ended\n");
+
+        return NULL; // exit thread
+    }
