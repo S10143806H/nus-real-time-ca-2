@@ -8,6 +8,8 @@ Lukas's design document provided sufficient details which made clear the intende
 
 I will say, however, that additional design diagrams would have made the process easier for a potential developer to implement this system.  The crux of the system design was not detailed in diagrammatic form, which might have led improper interpretation of the design during implementation.
 
+In Figure 1, I detail an addition the design diagram, which is an activity diagram showing data flows for the photo processing thread.  In giving specific logic related to the timing deadline of the external processing unit, a programmer could have an easier time implementing the design intention of discarding apples for which the quality is unknown by the time the apple is under the actuator.
+
 ![ADDITIONAL DIAGRAM SUGGESTION MADE BY ME](thread2_activityDFD.png)
 
 ##2. What are the advantages and disadvantages of the CA1 design adopted? How did it differ from your own CA1 design. What improvements would you suggest to the CA1 design, if any?
@@ -39,6 +41,7 @@ No stress test on a 4 cpu system
     Revenue from sale of good apples: $144
     Revenue loss due to system shortcomings: $127 (47%)
 
+
 Using the command `stress --cpu 1` on a 4 cpu system
 
     -- TEST RESULTS --
@@ -50,6 +53,7 @@ Using the command `stress --cpu 1` on a 4 cpu system
     Number of apples spoilt due to bad apples: 45
     Revenue from sale of good apples: $220
     Revenue loss due to system shortcomings: $48 (18%)
+
 
 Using the command `stress --cpu 4` on a 4 cpu system
 
