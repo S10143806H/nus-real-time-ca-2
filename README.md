@@ -99,83 +99,84 @@ Unfortunately, it seems like there are still bad apples going through the pipeli
     Revenue loss due to system shortcomings: $63 (23%)
 
 My improved implementation reflecting this redesign is given below
+```C
+void* runProcess(void* p) { // process thread implementation
 
-    void* runProcess(void* p) { // process thread implementation
+    printf("Processing thread started\n");
 
-        printf("Processing thread started\n");
+    int counter = 0;
 
-        int counter = 0;
+    do { // begin do-loop
+        counter++;
 
-        do { // begin do-loop
-            counter++;
+        int interruptFlag = 0;
 
-            int interruptFlag = 0;
+        // receive photo and time data
+        struct photo_msgbuf bufPempty;
+        msgrcv(msqidPhoto, &bufPempty, sizePhoto, 1, 0);
 
-            // receive photo and time data
-            struct photo_msgbuf bufPempty;
-            msgrcv(msqidPhoto, &bufPempty, sizePhoto, 1, 0);
+        // get startTime info for everyone
+        struct timeval startTime = bufPempty.photoTime.startingTime;
 
-            // get startTime info for everyone
-            struct timeval startTime = bufPempty.photoTime.startingTime;
+        // define monitor function
+        void * monitor(void* p) {
+            while (interruptFlag == 0) {
+                // get the current time
+                struct timeval currentTime;
+                gettimeofday(&currentTime, NULL);
 
-            // define monitor function
-            void * monitor(void* p) {
-                while (interruptFlag == 0) {
-                    // get the current time
-                    struct timeval currentTime;
-                    gettimeofday(&currentTime, NULL);
+                // calculate the time elapsed
+                double processTimeS = currentTime.tv_sec - startTime.tv_sec;
+                // assert( processTimeS >= 0 );
+                double processTimeMS = currentTime.tv_usec - startTime.tv_usec;
+                // assert( processTimeMS >= 0 );
+                double processTime = processTimeS + processTimeMS/1000000;
 
-                    // calculate the time elapsed
-                    double processTimeS = currentTime.tv_sec - startTime.tv_sec;
-                    // assert( processTimeS >= 0 );
-                    double processTimeMS = currentTime.tv_usec - startTime.tv_usec;
-                    // assert( processTimeMS >= 0 );
-                    double processTime = processTimeS + processTimeMS/1000000;
+                // overtime
+                if (processTime >= 5.0) {
+                    printf("damn slow. Bypassing the external processing unit!");
+                    // we're sending an UNKNOWN to the next message queue
+                    // without letting the external processing unit finish
+                    interruptFlag = 1;
 
-                    // overtime
-                    if (processTime >= 5.0) {
-                        printf("damn slow. Bypassing the external processing unit!");
-                        // we're sending an UNKNOWN to the next message queue
-                        // without letting the external processing unit finish
-                        interruptFlag = 1;
+                    // send message with UNKNOWN and time data
+                    struct qualTime_msgbuf bufQualTime = {2, {UNKNOWN, startTime}};
+                    msgsnd(msqidProcess, &bufQualTime, sizeProcess, 0);
 
-                        // send message with UNKNOWN and time data
-                        struct qualTime_msgbuf bufQualTime = {2, {UNKNOWN, startTime}};
-                        msgsnd(msqidProcess, &bufQualTime, sizeProcess, 0);
-
-                    }
-
-                    // poll every .10 seconds
-                    usleep(0.10*1000000);
-                }
-            }
-            // spin off monitor thread
-            pthread_t monitorThread;
-            pthread_create(&monitorThread, NULL, &monitor, NULL);
-
-            // process apple and get its quality
-            QUALITY photoQuality = process_photo(bufPempty.photoTime.photo);
-
-            // do the normal course of action if the external processing unit was not superseeded
-            if (interruptFlag == 0) {
-                if (photoQuality == GOOD)
-                {
-                    printf("Quality is GOOD for apple %d\n", counter);
-                } else if (photoQuality == BAD) {
-                    printf("Quality is BAD for apple %d\n", counter);
-                } else {
-                    printf("Quality is UNKNOWN for apple %d\n", counter);
                 }
 
-                // send message with apple quaility and time data
-                struct qualTime_msgbuf bufQualTime = {2, {photoQuality, startTime}};
-                msgsnd(msqidProcess, &bufQualTime, sizeProcess, 0);
+                // poll every .10 seconds
+                usleep(0.10*1000000);
+            }
+        }
+        // spin off monitor thread
+        pthread_t monitorThread;
+        pthread_create(&monitorThread, NULL, &monitor, NULL);
+
+        // process apple and get its quality
+        QUALITY photoQuality = process_photo(bufPempty.photoTime.photo);
+
+        // do the normal course of action if the external processing unit was not superseeded
+        if (interruptFlag == 0) {
+            if (photoQuality == GOOD)
+            {
+                printf("Quality is GOOD for apple %d\n", counter);
+            } else if (photoQuality == BAD) {
+                printf("Quality is BAD for apple %d\n", counter);
+            } else {
+                printf("Quality is UNKNOWN for apple %d\n", counter);
             }
 
-        //} while(counter <= numApples);
-        } while(more_apples() == 1); // end do-looop
+            // send message with apple quaility and time data
+            struct qualTime_msgbuf bufQualTime = {2, {photoQuality, startTime}};
+            msgsnd(msqidProcess, &bufQualTime, sizeProcess, 0);
+        }
 
-        printf("Processing thread ended\n");
+    //} while(counter <= numApples);
+    } while(more_apples() == 1); // end do-looop
 
-        return NULL; // exit thread
-    }
+    printf("Processing thread ended\n");
+
+    return NULL; // exit thread
+}
+```
